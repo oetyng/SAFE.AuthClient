@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Platforms>x64</Platforms>
+    <RootNamespace>SAFE.AuthClient</RootNamespace>
+    <AssemblyName>SAFE.AuthClient</AssemblyName>
+    <PackageTags>maidsafe safenetwork oetyng decentralized auth</PackageTags>
+    <Description>Auth client for SAFENetwork (Safe Access For Everyone) - a decentralized, secure and anonymous data storage network.</Description>
+    <Authors>oetyng</Authors>
+    <Company>oetyng</Company>
+    <Copyright>2019 oetyng</Copyright>
+    <RepositoryUrl>https://github.com/oetyng/SAFE.AuthClient</RepositoryUrl>
+    <Version>0.1.0-alpha.2</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MaidSafe.SafeApp" Version="0.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="crust.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="log.toml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="safe_authenticator.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
