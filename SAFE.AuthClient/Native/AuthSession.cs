@@ -7,24 +7,47 @@ using SAFE.AuthClient.Helpers;
 
 namespace SAFE.AuthClient.Native
 {
-    public class Authenticator : IDisposable
+    public class AuthSession : IDisposable
     {
         static readonly IAuthBindings AuthBindings = DependencyService.Get<IAuthBindings>();
+        readonly AuthSessionConfig _config;
 
-        IntPtr _authPtr;
+        IntPtr _authPtr = IntPtr.Zero;
         GCHandle _disconnectedHandle;
 
-        public static EventHandler Disconnected;
+        public EventHandler Disconnected;
 
-        public bool IsDisconnected { get; set; }
+        public bool IsDisconnected { get; private set; }
 
-        Authenticator()
+        AuthSession(AuthSessionConfig config)
+            => _config = config;
+
+        public static async Task<AuthSession> InitAuthAsync(AuthSessionConfig config)
         {
-            IsDisconnected = false;
-            _authPtr = IntPtr.Zero;
+            DependencyService.Register<IAuthBindings, AuthBindings>();
+            DependencyService.Register<IFileOps, FileOps>();
+            await InitLoggingAsync(null);
+            var auth = new AuthSession(config);
+            if (config.Invitation != null)
+                return await auth.CreateAccountAsync();
+            else
+                return await auth.LoginAsync();
         }
 
+        #region Static
         public static bool IsMockBuild() => AuthBindings.IsMockBuild();
+
+        public static Task SetAdditionalSearchPathAsync(string newPath)
+            => AuthBindings.AuthSetAdditionalSearchPathAsync(newPath);
+
+        public static Task OutputLogPathAsync(string outputFileName)
+            => AuthBindings.AuthOutputLogPathAsync(outputFileName);
+
+        public static Task<string> EncodeUnregisteredRespAsync(uint reqId, bool allow)
+            => AuthBindings.EncodeUnregisteredRespAsync(reqId, allow);
+
+        public static Task<string> GetExeFileStemAsync()
+            => AuthBindings.AuthExeFileStemAsync();
 
         public static async Task InitLoggingAsync(string outputFileName)
         {
@@ -39,15 +62,14 @@ namespace SAFE.AuthClient.Native
             await AuthBindings.AuthSetAdditionalSearchPathAsync(fileOps.ConfigFilesPath);
             await AuthBindings.AuthInitLoggingAsync(outputFileName);
         }
+        #endregion Static
 
-        public static Task<Authenticator> LoginAsync(string locator, string secret)
+        Task<AuthSession> LoginAsync()
         {
             return Task.Run(() =>
             {
-                var authenticator = new Authenticator();
-                var tcs = new TaskCompletionSource<Authenticator>();
-                Action disconnect = () => { OnDisconnected(authenticator); };
-                Action<FfiResult, IntPtr, GCHandle> cb = (result, ptr, disconnectHandle) =>
+                var tcs = new TaskCompletionSource<AuthSession>();
+                void cb(FfiResult result, IntPtr ptr, GCHandle disconnectHandle)
                 {
                     if (result.ErrorCode != 0)
                     {
@@ -58,63 +80,57 @@ namespace SAFE.AuthClient.Native
                         return;
                     }
 
-                    authenticator.Init(ptr, disconnectHandle);
-                    tcs.SetResult(authenticator);
-                };
-                AuthBindings.Login(locator, secret, disconnect, cb);
+                    Init(ptr, disconnectHandle);
+                    tcs.SetResult(this);
+                }
+                var credentials = _config.Credentials;
+                AuthBindings.Login(credentials.Locator, credentials.Secret, OnDisconnected, cb);
                 return tcs.Task;
             });
         }
 
-        public static Task<Authenticator> CreateAccountAsync(string locator, string secret, string invitation)
+        Task<AuthSession> CreateAccountAsync()
         {
-            return Task.Run(
-                () =>
+            return Task.Run(() =>
+            {
+                var tcs = new TaskCompletionSource<AuthSession>();
+                void cb(FfiResult result, IntPtr ptr, GCHandle disconnectHandle)
                 {
-                    var authenticator = new Authenticator();
-                    var tcs = new TaskCompletionSource<Authenticator>();
-                    Action disconnect = () => { OnDisconnected(authenticator); };
-                    Action<FfiResult, IntPtr, GCHandle> cb = (result, ptr, disconnectHandle) =>
+                    if (result.ErrorCode != 0)
                     {
-                        if (result.ErrorCode != 0)
-                        {
-                            if (disconnectHandle.IsAllocated)
-                            {
-                                disconnectHandle.Free();
-                            }
+                        if (disconnectHandle.IsAllocated)
+                            disconnectHandle.Free();
 
-                            tcs.SetException(result.ToException());
-                            return;
-                        }
+                        tcs.SetException(result.ToException());
+                        return;
+                    }
 
-                        authenticator.Init(ptr, disconnectHandle);
-                        tcs.SetResult(authenticator);
-                    };
-                    AuthBindings.CreateAccount(locator, secret, invitation, disconnect, cb);
-                    return tcs.Task;
-                });
+                    Init(ptr, disconnectHandle);
+                    tcs.SetResult(this);
+                }
+                var credentials = _config.Credentials;
+                AuthBindings.CreateAccount(credentials.Locator, credentials.Secret, _config.Invitation, OnDisconnected, cb);
+                return tcs.Task;
+            });
         }
 
-        public static Task SetAdditionalSearchPathAsync(string newPath)
-            => AuthBindings.AuthSetAdditionalSearchPathAsync(newPath);
-
-        public static Task OutputLogPathAsync(string outputFileName)
-            => AuthBindings.AuthOutputLogPathAsync(outputFileName);
-
-        public static Task<string> EncodeUnregisteredRespAsync(uint reqId, bool allow)
-            => AuthBindings.EncodeUnregisteredRespAsync(reqId, allow);
-
-        public static Task<string> GetExeFileStemAsync() 
-            => AuthBindings.AuthExeFileStemAsync();
+        public async Task ReconnectAsync()
+        {
+            if (IsDisconnected && _config.KeepAlive)
+            {
+                await AuthBindings.AuthReconnectAsync(_authPtr);
+                IsDisconnected = false;
+            }
+        }
 
         public Task<AccountInfo> GetAccountInfoAsync()
             => AuthBindings.AuthAccountInfoAsync(_authPtr);
 
-        public Task<List<AppAccess>> GetAppsAccessingMutableDataAsync(byte[] name, ulong typeTag)
-            => AuthBindings.AuthAppsAccessingMutableDataAsync(_authPtr, name, typeTag);
-
         public Task<List<RegisteredApp>> GetRegisteredAppsAsync()
             => AuthBindings.AuthRegisteredAppsAsync(_authPtr);
+
+        public Task<string> RevokeAppAsync(string appId)
+            => AuthBindings.AuthRevokeAppAsync(_authPtr, appId);
 
         public Task<List<AppExchangeInfo>> GetRevokedAppsAsync()
             => AuthBindings.AuthRevokedAppsAsync(_authPtr);
@@ -122,11 +138,8 @@ namespace SAFE.AuthClient.Native
         public Task FlushAppRevocationQueueAsync()
             => AuthBindings.AuthFlushAppRevocationQueueAsync(_authPtr);
 
-        public Task ReconnectAsync()
-            => AuthBindings.AuthReconnectAsync(_authPtr);
-
-        public Task<string> RevokeAppAsync(string appId)
-            => AuthBindings.AuthRevokeAppAsync(_authPtr, appId);
+        public Task<List<AppAccess>> GetAppsAccessingMutableDataAsync(byte[] name, ulong typeTag)
+            => AuthBindings.AuthAppsAccessingMutableDataAsync(_authPtr, name, typeTag);
 
         public Task AuthRmRevokedAppAsync(string appId)
             => AuthBindings.AuthRmRevokedAppAsync(_authPtr, appId);
@@ -152,7 +165,7 @@ namespace SAFE.AuthClient.Native
             GC.SuppressFinalize(this);
         }
 
-        ~Authenticator() => FreeAuth();
+        ~AuthSession() => FreeAuth();
 
         void FreeAuth()
         {
@@ -174,10 +187,10 @@ namespace SAFE.AuthClient.Native
             IsDisconnected = false;
         }
 
-        static void OnDisconnected(Authenticator authenticator)
+        void OnDisconnected()
         {
-            authenticator.IsDisconnected = true;
-            Disconnected?.Invoke(authenticator, EventArgs.Empty);
+            IsDisconnected = true;
+            Disconnected?.Invoke(this, EventArgs.Empty);
         }
     }
 }

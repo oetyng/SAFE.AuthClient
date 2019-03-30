@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using SafeApp;
-using SAFE.AuthClient.Native;
 
 namespace SAFE.AuthClient
 {
@@ -11,23 +10,24 @@ namespace SAFE.AuthClient
     {
         readonly Random Random = new Random();
 
-        public async Task<(Authenticator, Session)> CreateTestSessionAsync()
+        public async Task<Session> CreateAppAsync()
         {
+            var client = await CreateClientAsync();
+            return await client.CreateAppSessionAsync(CreateAuthRequest());
+        }
+
+        public async Task<AuthClient> CreateClientAsync()
+        {
+            string locator = GetRandomString(10);
             string secret = GetRandomString(10);
-            string password = GetRandomString(10);
             string invitation = GetRandomString(5);
-            return await CreateTestSessionAsync(secret, password, invitation);
+            var credentials = new Credentials(locator, secret);
+            var config = new AuthSessionConfig(credentials, keepAlive: true, invitation);
+            var client = await AuthClient.InitSessionAsync(config);
+            return client;
         }
 
-        public async Task<(Authenticator, Session)> CreateTestSessionAsync(string secret, string password, string invitation)
-        {
-            // validate mock flag is set
-            var authReq = CreateAuthRequest();
-            var auth = await AuthClient.InitiateAsync();
-            return await auth.CreateAccountAsync(secret, password, invitation, authReq);
-        }
-
-        public SafeApp.Utilities.AuthReq CreateAuthRequest()
+        SafeApp.Utilities.AuthReq CreateAuthRequest()
         {
             var authReq = new SafeApp.Utilities.AuthReq
             {

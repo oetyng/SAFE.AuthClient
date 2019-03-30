@@ -1,4 +1,4 @@
-﻿using SAFE.AuthClient.Services;
+﻿using SAFE.AuthClient;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -8,12 +8,13 @@ namespace SAFE.Console
     {
         static async Task Main()
         {
-            var config = new AuthSessionConfig("oetyng-123", "oetyng-123");
+            var credentials = new Credentials("oetyng-123", "oetyng-123");
+            var config = new AuthSessionConfig(credentials);
 
-            using (var auth = await AuthSession.InitAuthSession(config))
+            using (var client = await AuthClient.AuthClient.InitSessionAsync(config))
             {
-                var app = await auth.CreateAppSessionAsync(GetAuthReq());
-
+                var app = await client.CreateAppSessionAsync(GetAuthReq());
+                // run program with app
             }
         }
 
