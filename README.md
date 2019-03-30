@@ -1,8 +1,6 @@
 ## SAFE.AuthClient
 
-[![Nuget (with prereleases)](https://img.shields.io/nuget/vpre/SAFE.AuthClient.svg)](https://www.nuget.org/packages/SAFE.AuthClient)
-
-[![Build Status](https://dev.azure.com/oetyng/SAFE/_apis/build/status/oetyng.SAFE.AuthClient?branchName=dev-v.0.1.0-alpha.2)](https://dev.azure.com/oetyng/SAFE/_build/latest?definitionId=8&branchName=dev-v.0.1.0-alpha.2)
+[![Nuget (with prereleases)](https://img.shields.io/nuget/vpre/SAFE.AuthClient.svg)](https://www.nuget.org/packages/SAFE.AuthClient) [![Build Status](https://dev.azure.com/oetyng/SAFE/_apis/build/status/oetyng.SAFE.AuthClient?branchName=dev-v.0.1.0-alpha.2)](https://dev.azure.com/oetyng/SAFE/_build/latest?definitionId=8&branchName=dev-v.0.1.0-alpha.2)
 
 ## How to use it
 
