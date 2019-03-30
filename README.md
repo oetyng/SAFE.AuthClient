@@ -1,6 +1,6 @@
 ## How to use it
 
-- Reference MaidSafe.SafeApp (0.2.1) NuGet pkg.
+- Reference [MaidSafe.SafeApp (0.2.1)](https://www.nuget.org/packages/MaidSafe.SafeApp/) NuGet pkg.
 - Add [crust.config](https://github.com/oetyng/SAFE.AuthClient/blob/master/SAFE.AuthClient/crust.config) and [log.toml](https://github.com/oetyng/SAFE.AuthClient/blob/master/SAFE.AuthClient/log.toml) to your app exe path.
 (You can find these files in the solution folder of this repository.)
 
